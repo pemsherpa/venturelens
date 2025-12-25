@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileStack, TrendingUp, AlertTriangle, Zap, ChevronRight, ExternalLink } from "lucide-react";
+import { FileStack, TrendingUp, AlertTriangle, Zap, ChevronRight, ExternalLink, Globe, Linkedin, FileText } from "lucide-react";
 import { VCLayout } from "@/components/layout/VCLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { TrustScoreBadge } from "@/components/dashboard/TrustScoreBadge";
@@ -19,6 +19,10 @@ interface Startup {
   funding_raised: string | null;
   description: string | null;
   founder_id: string;
+  website_url: string | null;
+  linkedin_url: string | null;
+  deck_url: string | null;
+  created_at: string;
 }
 
 interface StartupWithAnomalies extends Startup {
@@ -184,7 +188,7 @@ export default function VCDashboardPage() {
                       Stage
                     </th>
                     <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">
-                      Funding
+                      Links
                     </th>
                     <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">
                       Action
@@ -226,8 +230,48 @@ export default function VCDashboardPage() {
                       <td className="py-4 px-6 text-sm text-muted-foreground">
                         {startup.stage || "N/A"}
                       </td>
-                      <td className="py-4 px-6 text-sm font-medium text-foreground">
-                        {startup.funding_raised || "N/A"}
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          {startup.website_url && (
+                            <a
+                              href={startup.website_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-primary"
+                              title="Website"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          )}
+                          {startup.linkedin_url && (
+                            <a
+                              href={startup.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-primary"
+                              title="LinkedIn"
+                            >
+                              <Linkedin className="h-4 w-4" />
+                            </a>
+                          )}
+                          {startup.deck_url && (
+                            <a
+                              href={startup.deck_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-primary"
+                              title="Pitch Deck"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          )}
+                          {!startup.website_url && !startup.linkedin_url && !startup.deck_url && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4 px-6 text-right">
                         <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
@@ -253,6 +297,10 @@ export default function VCDashboardPage() {
               stage: selectedStartup.stage || "N/A",
               funding: selectedStartup.funding_raised || "N/A",
               anomalies: selectedStartup.anomalies,
+              description: selectedStartup.description || undefined,
+              website_url: selectedStartup.website_url || undefined,
+              linkedin_url: selectedStartup.linkedin_url || undefined,
+              deck_url: selectedStartup.deck_url || undefined,
             }}
             isOpen={!!selectedStartup}
             onClose={() => setSelectedStartup(null)}

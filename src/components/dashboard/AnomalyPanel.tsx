@@ -1,4 +1,4 @@
-import { X, CheckCircle, AlertTriangle, XCircle, Shield } from "lucide-react";
+import { X, CheckCircle, AlertTriangle, XCircle, Shield, Globe, Linkedin, FileText } from "lucide-react";
 import { TrustScoreBadge } from "./TrustScoreBadge";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,10 @@ interface Startup {
   stage: string;
   funding: string;
   anomalies: Anomaly[];
+  description?: string;
+  website_url?: string;
+  linkedin_url?: string;
+  deck_url?: string;
 }
 
 interface AnomalyPanelProps {
@@ -108,6 +112,66 @@ export function AnomalyPanel({ startup, isOpen, onClose }: AnomalyPanelProps) {
                   <p className="text-xs text-muted-foreground mt-1">Critical</p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Company Info */}
+          <div className="p-6 border-b border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Company Info
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground w-20">Industry:</span>
+                <span className="text-foreground bg-secondary/50 px-3 py-1 rounded-lg">{startup.industry}</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground w-20">Stage:</span>
+                <span className="text-foreground">{startup.stage}</span>
+              </div>
+              {startup.description && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground block mb-1">Description:</span>
+                  <p className="text-foreground text-sm leading-relaxed">{startup.description}</p>
+                </div>
+              )}
+              {(startup.website_url || startup.linkedin_url || startup.deck_url) && (
+                <div className="flex items-center gap-3 pt-2">
+                  {startup.website_url && (
+                    <a
+                      href={startup.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm text-foreground transition-colors"
+                    >
+                      <Globe className="h-4 w-4 text-primary" />
+                      Website
+                    </a>
+                  )}
+                  {startup.linkedin_url && (
+                    <a
+                      href={startup.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm text-foreground transition-colors"
+                    >
+                      <Linkedin className="h-4 w-4 text-primary" />
+                      LinkedIn
+                    </a>
+                  )}
+                  {startup.deck_url && (
+                    <a
+                      href={startup.deck_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm text-foreground transition-colors"
+                    >
+                      <FileText className="h-4 w-4 text-primary" />
+                      Pitch Deck
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

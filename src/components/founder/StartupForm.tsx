@@ -185,54 +185,125 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
 
       setSubmitStatus("Analyzing with AI...");
 
-      // 2. Call n8n Webhook
+      // 2. Call n8n Webhooks (scores + anomalies in parallel)
       const webhookPayload = new FormData();
-      webhookPayload.append("file", file); // Send binary file if n8n expects it
+      webhookPayload.append("file", file);
       webhookPayload.append("data", JSON.stringify({
         ...data,
         founder_id: user.id,
         deck_url: publicUrl
       }));
 
-      // NOTE: Using a proxy approach or direct call depending on CORS. 
-      // Trying direct call first as webhook-test usually allows it.
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
       if (!webhookUrl) {
         throw new Error("Webhook URL is not configured");
       }
 
-      const n8nResponse = await fetch(webhookUrl, {
+      // Prepare both webhook calls
+      const scoresPromise = fetch(webhookUrl, {
         method: "POST",
         body: webhookPayload,
       });
+
+      // Anomalies webhook (optional - only called if configured)
+      const anomaliesWebhookUrl = import.meta.env.VITE_N8N_ANOMALIES_WEBHOOK_URL;
+      const anomaliesPayload = new FormData();
+      anomaliesPayload.append("file", file);
+      anomaliesPayload.append("data", JSON.stringify({
+        ...data,
+        founder_id: user.id,
+        deck_url: publicUrl
+      }));
+
+      const anomaliesPromise = anomaliesWebhookUrl 
+        ? fetch(anomaliesWebhookUrl, {
+            method: "POST",
+            body: anomaliesPayload,
+          })
+        : Promise.resolve(null);
+
+      // Await both webhook responses in parallel
+      const [n8nResponse, anomaliesResponse] = await Promise.all([scoresPromise, anomaliesPromise]);
 
       if (!n8nResponse.ok) {
         throw new Error("AI Analysis failed. Please try again.");
       }
 
       const responseText = await n8nResponse.text();
-      console.log("Raw Webhook Response:", responseText);
+      console.log("Raw Scores Webhook Response:", responseText);
 
       let result;
       try {
         result = JSON.parse(responseText);
       } catch (e) {
         console.error("Failed to parse webhook response:", e);
-        // Fallback or throw informative error
         throw new Error(`Invalid response from AI: ${responseText.substring(0, 100)}...`);
       }
 
-      console.log("Analysis Result:", result);
+      console.log("Scores Analysis Result:", result);
 
-      // Expecting result to contain scores/analysis
-      // Adjust structure based on actual n8n output. Assuming flat or nested 'scores'.
-      const scores = result.scores || result.Scores || {};
-      
-      // Calculate AI score
+      // Process anomalies response if available
+      let anomaliesResult = null;
+      if (anomaliesResponse && anomaliesResponse.ok) {
+        try {
+          const anomaliesText = await anomaliesResponse.text();
+          console.log("Raw Anomalies Webhook Response:", anomaliesText);
+          anomaliesResult = JSON.parse(anomaliesText);
+          console.log("Anomalies/Red Flags Result:", anomaliesResult);
+        } catch (e) {
+          console.error("Failed to parse anomalies webhook response:", e);
+        }
+      } else if (anomaliesResponse && !anomaliesResponse.ok) {
+        console.warn("Anomalies webhook returned error:", anomaliesResponse.status);
+      }
+
+      // Helper to clean n8n expression artifacts (removes "=" prefix) and convert to number
+      const cleanScore = (val: any): number => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+          const clean = val.startsWith('=') ? val.substring(1) : val;
+          return parseFloat(clean) || 0;
+        }
+        return 0;
+      };
+
+      // Helper to clean string values (removes "=" prefix)
+      const cleanString = (val: any): string => {
+        if (typeof val !== 'string') return '';
+        return val.startsWith('=') ? val.substring(1) : val;
+      };
+
+      // Get scores and reasoning from result
+      const rawScores = result.scores || result.Scores || {};
+      const rawReasoning = result.reasoning || result.Reasoning || {};
+
+      // Map scores to dashboard expected format (scale 0-10 to 0-100)
+      const mappedScores = {
+        Team: cleanScore(rawScores.team_score) * 10,
+        Market: cleanScore(rawScores.market_score) * 10,
+        Product: cleanScore(rawScores.product_score) * 10,
+        Traction: cleanScore(rawScores.traction_score) * 10 || 0,
+        Moat: cleanScore(rawScores.moat_score) * 10 || 0,
+      };
+
+      // Map reasoning to dashboard expected format (cleaned strings)
+      const mappedReasoning = {
+        Team: cleanString(rawReasoning.team),
+        Market: cleanString(rawReasoning.market),
+        Product: cleanString(rawReasoning.product),
+        Traction: cleanString(rawReasoning.traction) || '',
+        Moat: cleanString(rawReasoning.moat) || '',
+      };
+
+      // Calculate AI score from overall_score or average
       let aiScore = 0;
-      const scoreValues = Object.values(scores).filter((v): v is number => typeof v === "number");
-      if (scoreValues.length > 0) {
-        aiScore = Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length);
+      if (rawScores.overall_score) {
+        aiScore = cleanScore(rawScores.overall_score) * 10;
+      } else {
+        const scoreValues = Object.values(mappedScores).filter((v): v is number => typeof v === 'number' && v > 0);
+        if (scoreValues.length > 0) {
+          aiScore = Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length);
+        }
       }
 
       // Determine trust signal
@@ -254,13 +325,20 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
         deck_url: publicUrl,
         ai_score: aiScore,
         trust_signal: trustSignal,
-        // We could store the full analysis JSON if we add a column for it
       });
 
       if (dbError) throw dbError;
 
       // Store scores for the dashboard view
-      sessionStorage.setItem("analysisScores", JSON.stringify(scores));
+      sessionStorage.setItem("analysisScores", JSON.stringify(mappedScores));
+      
+      // Store reasoning for the dashboard view
+      sessionStorage.setItem("analysisReasoning", JSON.stringify(mappedReasoning));
+      
+      // Store anomalies for the dashboard view
+      if (anomaliesResult) {
+        sessionStorage.setItem("analysisAnomalies", JSON.stringify(anomaliesResult));
+      }
 
       onSuccess?.();
     } catch (error) {
@@ -276,31 +354,6 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
     }
   };
 
-  // Full-screen loading overlay
-  if (isSubmitting) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
-        <div className="text-center space-y-6 p-8">
-          <div className="mx-auto h-24 w-24 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center animate-pulse">
-            <Loader2 className="h-12 w-12 text-primary animate-spin" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-foreground">
-              {submitStatus || "Processing..."}
-            </h2>
-            <p className="text-muted-foreground max-w-sm">
-              Please wait while we analyze your pitch deck and save your startup details.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">

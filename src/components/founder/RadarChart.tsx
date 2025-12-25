@@ -16,12 +16,26 @@ interface RadarDataPoint {
 
 interface RadarChartProps {
   data: RadarDataPoint[];
+  onCategoryClick?: (category: string) => void;
 }
 
-export function RadarChart({ data }: RadarChartProps) {
+export function RadarChart({ data, onCategoryClick }: RadarChartProps) {
+  const handleClick = (e: any) => {
+    if (e && e.activeLabel && onCategoryClick) {
+      onCategoryClick(e.activeLabel);
+    }
+  };
+
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <RechartsRadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
+      <RechartsRadarChart 
+        data={data} 
+        cx="50%" 
+        cy="50%" 
+        outerRadius="75%"
+        onClick={handleClick}
+        style={{ cursor: onCategoryClick ? 'pointer' : 'default' }}
+      >
         <PolarGrid
           stroke="hsl(230, 20%, 25%)"
           strokeDasharray="3 3"
@@ -30,6 +44,8 @@ export function RadarChart({ data }: RadarChartProps) {
           dataKey="axis"
           tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 12 }}
           tickLine={false}
+          onClick={(e: any) => onCategoryClick && onCategoryClick(e.value)}
+          style={{ cursor: onCategoryClick ? 'pointer' : 'default' }}
         />
         <PolarRadiusAxis
           angle={30}
@@ -47,6 +63,7 @@ export function RadarChart({ data }: RadarChartProps) {
           }}
           labelStyle={{ color: "hsl(220, 20%, 95%)", fontWeight: 600 }}
           itemStyle={{ color: "hsl(239, 84%, 67%)" }}
+          formatter={(value: number) => [`${value}%`, 'Score']}
         />
         <Radar
           name="Score"
