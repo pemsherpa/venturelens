@@ -276,6 +276,32 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
     }
   };
 
+  // Full-screen loading overlay
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+        <div className="text-center space-y-6 p-8">
+          <div className="mx-auto h-24 w-24 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center animate-pulse">
+            <Loader2 className="h-12 w-12 text-primary animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-foreground">
+              {submitStatus || "Processing..."}
+            </h2>
+            <p className="text-muted-foreground max-w-sm">
+              Please wait while we analyze your pitch deck and save your startup details.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Startup Details Form */}
