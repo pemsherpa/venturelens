@@ -34,30 +34,56 @@ export function VCInsightChat() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+  if (!input.trim()) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: "user",
-      content: input,
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: "user",
+    content: input,
+    timestamp: new Date(),
+  };
+
+  // Show user message immediately
+  setMessages((prev) => [...prev, userMessage]);
+  setInput("");
+
+  try {
+    const response = await fetch(
+      "https://pema7476.app.n8n.cloud/webhook-test/ChatBOT",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: "ai",
+      content: data.message ?? "No response from AI",
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
+    setMessages((prev) => [...prev, aiMessage]);
+  } catch (error) {
+    setMessages((prev) => [
+      ...prev,
+      {
         id: (Date.now() + 1).toString(),
         type: "ai",
-        content: "That's a great point! Based on successful Series A decks in your space, I'd suggest focusing on demonstrating clear product-market fit with quantitative metrics. Would you like me to elaborate on specific KPIs VCs look for?",
+        content: "Sorry, something went wrong. Please try again.",
         timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-    }, 1500);
-  };
+      },
+    ]);
+  }
+};
 
   return (
     <div className="glass-card rounded-2xl h-full flex flex-col gradient-border">

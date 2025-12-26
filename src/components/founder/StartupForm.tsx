@@ -199,7 +199,7 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
         throw new Error("Webhook URL is not configured");
       }
 
-      // Prepare both webhook calls
+      // Prepare all webhook calls
       const scoresPromise = fetch(webhookUrl, {
         method: "POST",
         body: webhookPayload,
@@ -222,8 +222,37 @@ export function StartupForm({ onSuccess }: StartupFormProps) {
           })
         : Promise.resolve(null);
 
-      // Await both webhook responses in parallel
-      const [n8nResponse, anomaliesResponse] = await Promise.all([scoresPromise, anomaliesPromise]);
+      // Vector Store Ingestion webhook (optional - uploads PDF to vector store for RAG)
+      const vectorStoreWebhookUrl = import.meta.env.VITE_N8N_VECTOR_STORE_WEBHOOK_URL;
+      const vectorStorePayload = new FormData();
+      vectorStorePayload.append("file", file);
+      vectorStorePayload.append("data", JSON.stringify({
+        ...data,
+        founder_id: user.id,
+        deck_url: publicUrl,
+        startup_name: data.name
+      }));
+
+      const vectorStorePromise = vectorStoreWebhookUrl
+        ? fetch(vectorStoreWebhookUrl, {
+            method: "POST",
+            body: vectorStorePayload,
+          })
+        : Promise.resolve(null);
+
+      // Await all webhook responses in parallel
+      const [n8nResponse, anomaliesResponse, vectorStoreResponse] = await Promise.all([
+        scoresPromise, 
+        anomaliesPromise,
+        vectorStorePromise
+      ]);
+
+      // Log vector store response (fire-and-forget, but log for debugging)
+      if (vectorStoreResponse && vectorStoreResponse.ok) {
+        console.log("Vector store ingestion completed successfully");
+      } else if (vectorStoreResponse && !vectorStoreResponse.ok) {
+        console.warn("Vector store ingestion returned error:", vectorStoreResponse.status);
+      }
 
       if (!n8nResponse.ok) {
         throw new Error("AI Analysis failed. Please try again.");
